@@ -50,30 +50,36 @@
 
 - (void)contextDidSave:(NSNotification*)notification
 {
-    if (!self.fetchedObjects) {
+    if (!self.fetchedObjects && self.delegate) {
         return;
     }
     
     NSArray *updatedObjects = [[notification userInfo] objectForKey:NSUpdatedObjectsKey];
     NSArray *deletedObjects = [[notification userInfo] objectForKey:NSDeletedObjectsKey];
-    NSMutableArray *mutableObjects = [NSMutableArray arrayWithArray:self.fetchedObjects];
 
-    for (NSManagedObject *existingObject in self.fetchedObjects) {
-        for (NSManagedObject *updatedObject in updatedObjects) {
-            if ([updatedObject.objectID isEqual:existingObject.objectID]) {
-                [self.context refreshObject:existingObject mergeChanges:YES];
+    if ([self.delegate respondsToSelector:@selector(controller:updatedObjects:)]) {
+        NSIndexSet *updatedIndexes = [self.fetchedObjects indexesOfObjectsPassingTest:^BOOL(NSManagedObject* existingObject, NSUInteger idx, BOOL *stop) {
+            for (NSManagedObject *updatedObject in updatedObjects) {
+                if ([updatedObject.objectID isEqual:existingObject.objectID]) {
+                    return YES;
+                }
             }
-        }
-
-        for (NSManagedObject *deletedObject in deletedObjects) {
-            if ([deletedObject.objectID isEqual:existingObject.objectID]) {
-                [mutableObjects removeObject:existingObject];
-            }
-        }
+            return NO;
+        }];
+        
+        [self.delegate controller:self updatedObjects:updatedIndexes];
     }
     
-    self.fetchedObjects = nil;
-    self.fetchedObjects = [NSArray arrayWithArray:mutableObjects];
+    if ([self.delegate respondsToSelector:@selector(controller:deletedObjects:)]) {
+        NSIndexSet *deletedIndexes = [self.fetchedObjects indexesOfObjectsPassingTest:^BOOL(NSManagedObject* existingObject, NSUInteger idx, BOOL *stop) {
+            return [deletedObjects containsObject:existingObject];
+        }];
+        
+        [self.delegate controller:self updatedObjects:deletedIndexes];
+    }
+    
+
+
 }
 
 @end

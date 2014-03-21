@@ -8,10 +8,25 @@
 
 #import <Foundation/Foundation.h>
 
+@class SJOManagedObjectController;
+
+@protocol SJOManagedObjectControllerDelegate <NSObject>
+@optional
+-(void)controller:(SJOManagedObjectController*)controller
+   fetchedObjects:(NSIndexSet*)fetchedObjectIndexes;
+-(void)controller:(SJOManagedObjectController*)controller
+   updatedObjects:(NSIndexSet*)changedObjectIndexes;
+-(void)controller:(SJOManagedObjectController*)controller
+   deletedObjects:(NSIndexSet*)deletedObjectIndexes;
+@end
+
+
 @interface SJOManagedObjectController : NSObject
 @property (nonatomic, strong, readonly) NSFetchRequest *fetchRequest;
 @property (nonatomic, strong, readonly) NSArray *fetchedObjects;
 @property (nonatomic, strong, readonly) NSManagedObjectContext *context;
+
+@property (nonatomic, weak) id<SJOManagedObjectControllerDelegate> delegate;
 
 - (instancetype)initWithFetchRequest:(NSFetchRequest *)fetchRequest managedObjectContext:(NSManagedObjectContext *)context;
 - (BOOL)performFetch:(NSError**)error;
