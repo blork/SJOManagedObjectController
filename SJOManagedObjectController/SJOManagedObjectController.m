@@ -9,27 +9,63 @@
 #import "SJOManagedObjectController.h"
 #import "NSArray+SJOIndexSet.h"
 
+NSString* const SJOManagedObjectControllerErrorDomain = @"SJOManagedObjectControllerErrorDomain";
+
 @interface SJOManagedObjectController ()
 @property (nonatomic, strong) NSFetchRequest *fetchRequest;
-@property (nonatomic, strong) NSArray *fetchedObjects;
+@property (nonatomic, strong) NSArray *managedObjects;
 @property (nonatomic, strong) NSManagedObjectContext *managedObjectContext;
 @end
 
 
 @implementation SJOManagedObjectController
 
-- (instancetype)initWithFetchRequest:(NSFetchRequest *)fetchRequest managedObjectContext:(NSManagedObjectContext *)context
+- (instancetype)init
 {
     self = [super init];
     if (self) {
-        _fetchRequest = fetchRequest;
-        _managedObjectContext = context;
-        
         [[NSNotificationCenter defaultCenter] addObserver:self
                                                  selector:@selector(contextDidSave:)
                                                      name:NSManagedObjectContextDidSaveNotification object:nil];
     }
     return self;
+}
+
+- (instancetype)initWithFetchRequest:(NSFetchRequest *)fetchRequest managedObjectContext:(NSManagedObjectContext *)context
+{
+    if (!fetchRequest || !context) {
+        return nil;
+    }
+    
+    self = [self init];
+    if (self) {
+        _fetchRequest = fetchRequest;
+        _managedObjectContext = context;
+    }
+    return self;
+}
+
+- (instancetype)initWithWithManagedObjects:(NSArray *)managedObjects
+{
+    if (!managedObjects || managedObjects.count == 0) {
+        return nil;
+    }
+    
+    self = [self init];
+    if (self) {
+        _managedObjectContext = [[managedObjects firstObject] managedObjectContext];
+        _managedObjects = [managedObjects copy];
+    }
+    return self;
+}
+
+- (instancetype)initWithWithManagedObject:(NSManagedObject *)managedObject
+{
+    if (!managedObject) {
+        return nil;
+    }
+    
+    return [self initWithWithManagedObjects:@[managedObject]];
 }
 
 -(void)dealloc
@@ -42,17 +78,33 @@
 
 #pragma mark Fetching
 
+- (BOOL)refreshObjects:(NSError**)error
+{
+    return [self performFetch:error];
+}
+
 - (BOOL)performFetch:(NSError**)error
 {
-    self.fetchedObjects = [self.managedObjectContext executeFetchRequest:self.fetchRequest error:error];
+    if (!self.fetchRequest) {
+        *error = [NSError errorWithDomain:SJOManagedObjectControllerErrorDomain
+                                     code:1
+                                 userInfo:@{NSLocalizedDescriptionKey : @"No fetch request set!"}];
+        return NO;
+    }
+    
+    self.managedObjects = [self.managedObjectContext executeFetchRequest:self.fetchRequest error:error];
     if ([self.delegate respondsToSelector:@selector(controller:fetchedObjects:error:)]) {
-        [self.delegate controller:self fetchedObjects:[self.fetchedObjects sjo_indexesOfObjects] error:error];
+        [self.delegate controller:self fetchedObjects:[self.managedObjects sjo_indexesOfObjects] error:error];
     }
     return error ? NO : YES;
 }
 
 - (void)performFetchAsyncronously
 {
+    if (!self.fetchRequest) {
+        return;
+    }
+    
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSManagedObjectContext* privateContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
         privateContext.persistentStoreCoordinator = self.managedObjectContext.persistentStoreCoordinator;
@@ -70,9 +122,9 @@
             for (NSManagedObjectID *objectID in managedObjectIds) {
                 [objectsToReturn addObject:[self.managedObjectContext objectWithID:objectID]];
             }
-            self.fetchedObjects = [NSArray arrayWithArray:objectsToReturn];
+            self.managedObjects = [NSArray arrayWithArray:objectsToReturn];
             if ([self.delegate respondsToSelector:@selector(controller:fetchedObjects:error:)]) {
-                [self.delegate controller:self fetchedObjects:[self.fetchedObjects sjo_indexesOfObjects] error:&error];
+                [self.delegate controller:self fetchedObjects:[self.managedObjects sjo_indexesOfObjects] error:&error];
             }
         });
         
@@ -83,10 +135,14 @@
 
 - (BOOL)deleteObjects:(NSError**)error
 {
-    if (!self.fetchedObjects) {
+    if (!self.managedObjects) {
+        *error = [NSError errorWithDomain:SJOManagedObjectControllerErrorDomain
+                                     code:2
+                                 userInfo:@{NSLocalizedDescriptionKey : @"No objects to delete! You must call performFetch: first."}];
         return NO;
     }
-    for (NSManagedObject *object in self.fetchedObjects) {
+    
+    for (NSManagedObject *object in self.managedObjects) {
         [self.managedObjectContext deleteObject:object];
     }
     [self.managedObjectContext save:error];
@@ -96,7 +152,7 @@
 
 - (void)deleteObjectsAsyncronously
 {
-    NSArray *managedObjectIds = [self.fetchedObjects valueForKey:@"objectID"];
+    NSArray *managedObjectIds = [self.managedObjects valueForKey:@"objectID"];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSManagedObjectContext* privateContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
         privateContext.persistentStoreCoordinator = self.managedObjectContext.persistentStoreCoordinator;
@@ -115,7 +171,7 @@
 
 - (void)contextDidSave:(NSNotification*)notification
 {
-    if (!self.fetchedObjects && self.delegate) {
+    if (!self.managedObjects && self.delegate) {
         return;
     }
     
@@ -123,7 +179,7 @@
     NSArray *deletedObjects = [[notification userInfo] objectForKey:NSDeletedObjectsKey];
     
     if ([self.delegate respondsToSelector:@selector(controller:updatedObjects:)] && updatedObjects && updatedObjects.count > 0) {
-        NSIndexSet *updatedIndexes = [self.fetchedObjects indexesOfObjectsPassingTest:^BOOL(NSManagedObject* existingObject, NSUInteger idx, BOOL *stop) {
+        NSIndexSet *updatedIndexes = [self.managedObjects indexesOfObjectsPassingTest:^BOOL(NSManagedObject* existingObject, NSUInteger idx, BOOL *stop) {
             for (NSManagedObject *updatedObject in updatedObjects) {
                 if ([updatedObject.objectID isEqual:existingObject.objectID]) {
                     return YES;
@@ -138,7 +194,7 @@
     }
     
     if ([self.delegate respondsToSelector:@selector(controller:deletedObjects:)] && deletedObjects && deletedObjects.count > 0) {
-        NSIndexSet *deletedIndexes = [self.fetchedObjects indexesOfObjectsPassingTest:^BOOL(NSManagedObject* existingObject, NSUInteger idx, BOOL *stop) {
+        NSIndexSet *deletedIndexes = [self.managedObjects indexesOfObjectsPassingTest:^BOOL(NSManagedObject* existingObject, NSUInteger idx, BOOL *stop) {
             for (NSManagedObject *deletedObject in deletedObjects) {
                 if ([deletedObject.objectID isEqual:existingObject.objectID]) {
                     return YES;

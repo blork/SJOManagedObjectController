@@ -10,6 +10,9 @@
 
 @class SJOManagedObjectController;
 
+extern NSString* const SJOManagedObjectControllerErrorDomain;
+
+
 @protocol SJOManagedObjectControllerDelegate <NSObject>
 @optional
 -(void)controller:(SJOManagedObjectController*)controller
@@ -23,12 +26,16 @@
 
 @interface SJOManagedObjectController : NSObject
 @property (nonatomic, strong, readonly) NSFetchRequest *fetchRequest;
-@property (nonatomic, strong, readonly) NSArray *fetchedObjects;
+@property (nonatomic, strong, readonly) NSArray *managedObjects;
 @property (nonatomic, strong, readonly) NSManagedObjectContext *managedObjectContext;
 
 @property (nonatomic, weak) id<SJOManagedObjectControllerDelegate> delegate;
 
 - (instancetype)initWithFetchRequest:(NSFetchRequest *)fetchRequest managedObjectContext:(NSManagedObjectContext *)context;
+- (instancetype)initWithWithManagedObjects:(NSArray *)managedObjects;
+- (instancetype)initWithWithManagedObject:(NSManagedObject *)managedObject;
+
+- (BOOL)refreshObjects:(NSError**)error;
 - (BOOL)performFetch:(NSError**)error;
 - (void)performFetchAsyncronously;
 - (BOOL)deleteObjects:(NSError**)error;

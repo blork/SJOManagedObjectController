@@ -29,6 +29,7 @@
     [super setUp];
     self.fetchDone = NO;
     self.updateDone = NO;
+    self.deletionDone = NO;
 
     self.managedObjectContext = [(AppDelegate*)[[UIApplication sharedApplication] delegate] managedObjectContext];
     
@@ -39,6 +40,7 @@
     [self.managedObjectContext save:nil];
     
     NSFetchRequest *request = [NSFetchRequest fetchRequestWithEntityName:@"Post"];
+    
     self.controller = [[SJOManagedObjectController alloc] initWithFetchRequest:request
                                                                                  managedObjectContext:self.managedObjectContext];
     self.controller.delegate = self;
@@ -49,14 +51,11 @@
     // Put teardown code here. This method is called after the invocation of each test method in the class.
     [super tearDown];
     NSFetchRequest *request = [NSFetchRequest fetchRequestWithEntityName:@"Post"];
-    NSArray *fetchedObjects = [self.managedObjectContext executeFetchRequest:request error:nil];
-    for (NSManagedObject *object in fetchedObjects) {
+    NSArray *managedObjects = [self.managedObjectContext executeFetchRequest:request error:nil];
+    for (NSManagedObject *object in managedObjects) {
         [self.managedObjectContext deleteObject:object];
     }
     [self.managedObjectContext save:nil];
-    self.fetchDone = NO;
-    self.updateDone = NO;
-    
     self.controller.delegate = nil;
     self.controller = nil;
 }
@@ -67,8 +66,8 @@
     [self.controller performFetch:&error];
 
     XCTAssertNil(error, @"");
-    XCTAssertEqual([[self.controller fetchedObjects] count], 1, @"");
-    XCTAssertEqual([[self.controller fetchedObjects] firstObject], self.post, @"");
+    XCTAssertEqual([[self.controller managedObjects] count], 1, @"");
+    XCTAssertEqual([[self.controller managedObjects] firstObject], self.post, @"");
 }
 
 - (void)testUpdating
@@ -79,7 +78,6 @@
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSManagedObjectContext* privateContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
         privateContext.persistentStoreCoordinator = [(AppDelegate*)[[UIApplication sharedApplication] delegate] persistentStoreCoordinator];
-        
         [privateContext performBlockAndWait:^{
             Post *post = (Post*)[privateContext objectWithID:self.post.objectID];
             post.title = @"Hello!";
@@ -89,19 +87,19 @@
 
     AGWW_WAIT_WHILE(!self.updateDone, 2.0);
     
-    XCTAssertEqual([[self.controller fetchedObjects] count], 1, @"");
-    XCTAssertEqualObjects([[[self.controller fetchedObjects] firstObject] title], @"Hello!", @"");
+    XCTAssertEqual([[self.controller managedObjects] count], 1, @"");
+    XCTAssertEqualObjects([[[self.controller managedObjects] firstObject] title], @"Hello!", @"");
 }
 
 -(void)testAsyncFetching
 {
     [self.controller performFetchAsyncronously];
     
-    XCTAssertNil([self.controller fetchedObjects], @"");
+    XCTAssertNil([self.controller managedObjects], @"");
     AGWW_WAIT_WHILE(!self.fetchDone, 2.0);
-    XCTAssertEqual([[self.controller fetchedObjects] count], 1, @"");
+    XCTAssertEqual([[self.controller managedObjects] count], 1, @"");
     
-    Post *post = [[self.controller fetchedObjects] firstObject];
+    Post *post = [[self.controller managedObjects] firstObject];
     XCTAssertEqual(post.managedObjectContext, self.managedObjectContext, @"");
 }
 
@@ -109,7 +107,7 @@
 {
     [self.controller performFetch:nil];
 
-    XCTAssertEqual([[self.controller fetchedObjects] firstObject], self.post, @"");
+    XCTAssertEqual([[self.controller managedObjects] firstObject], self.post, @"");
 
     NSError *error = nil;
     [self.controller deleteObjects:&error];
@@ -170,7 +168,54 @@
     XCTAssertNil(error, @"");
 }
 
+-(void)testFetchToRefresh
+{
+    [self.controller performFetch:nil];
+    
+    self.managedObjectContext = [(AppDelegate*)[[UIApplication sharedApplication] delegate] managedObjectContext];
+    
+    Post* post = [NSEntityDescription insertNewObjectForEntityForName:@"Post"
+                                              inManagedObjectContext:self.managedObjectContext];
+    post.date = [NSDate date];
+    post.title = @"Another test!";
+    [self.managedObjectContext save:nil];
+    
+    XCTAssertEqual([[self.controller managedObjects] count], 1, @"");
 
+    [self.controller refreshObjects:nil];
+    
+    XCTAssertEqual([[self.controller managedObjects] count], 2, @"");
+    
+    XCTAssertEqualObjects([[[self.controller managedObjects] firstObject] title], @"Another test!", @"");
+}
+
+#pragma mark - Other Initialisers
+
+-(void)testInitialisingWithObjects
+{
+    [self.controller performFetch:nil];
+    SJOManagedObjectController *objectsController = [[SJOManagedObjectController alloc] initWithWithManagedObjects:[self.controller managedObjects]];
+    objectsController.delegate = self;
+    XCTAssertNotNil(objectsController, @"");
+    
+    self.post.title = @"Can you see me?";
+    [self.managedObjectContext save:nil];
+    
+    XCTAssertEqualObjects([[[objectsController managedObjects] firstObject] title], @"Can you see me?", @"");
+}
+
+-(void)testInitialisingWithObject
+{
+    [self.controller performFetch:nil];
+    SJOManagedObjectController *objectsController = [[SJOManagedObjectController alloc] initWithWithManagedObject:[[self.controller managedObjects] firstObject]];
+    objectsController.delegate = self;
+    XCTAssertNotNil(objectsController, @"");
+    
+    self.post.title = @"Can you see me?";
+    [self.managedObjectContext save:nil];
+    
+    XCTAssertEqualObjects([[[objectsController managedObjects] firstObject] title], @"Can you see me?", @"");
+}
 
 #pragma mark - Deletion
 
