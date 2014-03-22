@@ -7,11 +7,12 @@
 //
 
 #import "SJOManagedObjectController.h"
+#import "NSArray+SJOIndexSet.h"
 
 @interface SJOManagedObjectController ()
 @property (nonatomic, strong) NSFetchRequest *fetchRequest;
 @property (nonatomic, strong) NSArray *fetchedObjects;
-@property (nonatomic, strong) NSManagedObjectContext *context;
+@property (nonatomic, strong) NSManagedObjectContext *managedObjectContext;
 @end
 
 
@@ -22,7 +23,7 @@
     self = [super init];
     if (self) {
         _fetchRequest = fetchRequest;
-        _context = context;
+        _managedObjectContext = context;
         
         [[NSNotificationCenter defaultCenter] addObserver:self
                                                  selector:@selector(contextDidSave:)
@@ -33,6 +34,7 @@
 
 -(void)dealloc
 {
+    self.delegate = nil;
     [[NSNotificationCenter defaultCenter] removeObserver:self
                                                     name:NSManagedObjectContextDidSaveNotification
                                                   object:nil];
@@ -42,8 +44,71 @@
 
 - (BOOL)performFetch:(NSError**)error
 {
-    self.fetchedObjects = [self.context executeFetchRequest:self.fetchRequest error:error];
+    self.fetchedObjects = [self.managedObjectContext executeFetchRequest:self.fetchRequest error:error];
+    if ([self.delegate respondsToSelector:@selector(controller:fetchedObjects:error:)]) {
+        [self.delegate controller:self fetchedObjects:[self.fetchedObjects sjo_indexesOfObjects] error:error];
+    }
     return error ? NO : YES;
+}
+
+- (void)performFetchAsyncronously
+{
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSManagedObjectContext* privateContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
+        privateContext.persistentStoreCoordinator = self.managedObjectContext.persistentStoreCoordinator;
+        
+        __block NSArray *fetchedObjects;
+        __block NSError *error = nil;
+        [privateContext performBlockAndWait:^{
+            fetchedObjects = [privateContext executeFetchRequest:self.fetchRequest error:&error];
+        }];
+        
+        NSArray *managedObjectIds = [fetchedObjects valueForKey:@"objectID"];
+        
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSMutableArray *objectsToReturn = [NSMutableArray array];
+            for (NSManagedObjectID *objectID in managedObjectIds) {
+                [objectsToReturn addObject:[self.managedObjectContext objectWithID:objectID]];
+            }
+            self.fetchedObjects = [NSArray arrayWithArray:objectsToReturn];
+            if ([self.delegate respondsToSelector:@selector(controller:fetchedObjects:error:)]) {
+                [self.delegate controller:self fetchedObjects:[self.fetchedObjects sjo_indexesOfObjects] error:&error];
+            }
+        });
+        
+    });
+}
+
+#pragma mark - Operations
+
+- (BOOL)deleteObjects:(NSError**)error
+{
+    if (!self.fetchedObjects) {
+        return NO;
+    }
+    for (NSManagedObject *object in self.fetchedObjects) {
+        [self.managedObjectContext deleteObject:object];
+    }
+    [self.managedObjectContext save:error];
+    
+    return error ? NO : YES;
+}
+
+- (void)deleteObjectsAsyncronously
+{
+    NSArray *managedObjectIds = [self.fetchedObjects valueForKey:@"objectID"];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSManagedObjectContext* privateContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
+        privateContext.persistentStoreCoordinator = self.managedObjectContext.persistentStoreCoordinator;
+        for (NSManagedObjectID *objectID in managedObjectIds) {
+            [privateContext deleteObject:[privateContext objectWithID:objectID]];
+        }
+        NSError *error = nil;
+        [privateContext save:&error];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self.managedObjectContext save:nil];
+        });
+    });
 }
 
 #pragma mark - NSNotifications
@@ -56,8 +121,8 @@
     
     NSArray *updatedObjects = [[notification userInfo] objectForKey:NSUpdatedObjectsKey];
     NSArray *deletedObjects = [[notification userInfo] objectForKey:NSDeletedObjectsKey];
-
-    if ([self.delegate respondsToSelector:@selector(controller:updatedObjects:)]) {
+    
+    if ([self.delegate respondsToSelector:@selector(controller:updatedObjects:)] && updatedObjects && updatedObjects.count > 0) {
         NSIndexSet *updatedIndexes = [self.fetchedObjects indexesOfObjectsPassingTest:^BOOL(NSManagedObject* existingObject, NSUInteger idx, BOOL *stop) {
             for (NSManagedObject *updatedObject in updatedObjects) {
                 if ([updatedObject.objectID isEqual:existingObject.objectID]) {
@@ -67,19 +132,25 @@
             return NO;
         }];
         
-        [self.delegate controller:self updatedObjects:updatedIndexes];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self.delegate controller:self updatedObjects:updatedIndexes];
+        });
     }
     
-    if ([self.delegate respondsToSelector:@selector(controller:deletedObjects:)]) {
+    if ([self.delegate respondsToSelector:@selector(controller:deletedObjects:)] && deletedObjects && deletedObjects.count > 0) {
         NSIndexSet *deletedIndexes = [self.fetchedObjects indexesOfObjectsPassingTest:^BOOL(NSManagedObject* existingObject, NSUInteger idx, BOOL *stop) {
-            return [deletedObjects containsObject:existingObject];
+            for (NSManagedObject *deletedObject in deletedObjects) {
+                if ([deletedObject.objectID isEqual:existingObject.objectID]) {
+                    return YES;
+                }
+            }
+            return NO;
         }];
         
-        [self.delegate controller:self updatedObjects:deletedIndexes];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self.delegate controller:self deletedObjects:deletedIndexes];
+        });
     }
-    
-
-
 }
 
 @end
