@@ -94,15 +94,6 @@ extern NSString* const SJOManagedObjectControllerErrorDomain;
 - (instancetype)initWithWithManagedObject:(NSManagedObject *)managedObject;
 
 /**
- *  Re-run the fetch request. Identical to calling performFetch:.
- *
- *  @param error If there is a problem executing the fetch, upon return contains an instance of NSError that describes the problem.
- *
- *  @return YES if the fetch succeeds, otherwise NO.
- */
-- (BOOL)refreshObjects:(NSError**)error;
-
-/**
  *  Execute the fetch request and store the results in self.managedObjects.
  *  Blocks the main thread.
  *

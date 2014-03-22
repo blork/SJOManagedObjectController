@@ -78,11 +78,6 @@ NSString* const SJOManagedObjectControllerErrorDomain = @"SJOManagedObjectContro
 
 #pragma mark Fetching
 
-- (BOOL)refreshObjects:(NSError**)error
-{
-    return [self performFetch:error];
-}
-
 - (BOOL)performFetch:(NSError**)error
 {
     if (!self.fetchRequest) {

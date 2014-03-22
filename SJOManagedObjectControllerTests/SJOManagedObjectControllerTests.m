@@ -182,7 +182,7 @@
     
     XCTAssertEqual([[self.controller managedObjects] count], 1, @"");
 
-    [self.controller refreshObjects:nil];
+    [self.controller performFetch:nil];
     
     XCTAssertEqual([[self.controller managedObjects] count], 2, @"");
     
