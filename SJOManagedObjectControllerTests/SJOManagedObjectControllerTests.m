@@ -49,6 +49,9 @@
     self.controller = [[SJOManagedObjectController alloc] initWithFetchRequest:request
                                                           managedObjectContext:self.managedObjectContext];
     self.controller.delegate = self;
+    self.controller.updatedObjectsBlock = nil;
+    self.controller.fetchedObjectsBlock = nil;
+    self.controller.deletedObjectsBlock = nil;
 }
 
 
@@ -88,6 +91,14 @@
 - (void)testUpdating
 {
     NSError *error = nil;
+    
+    __block bool blockUpdateDone = NO;
+    self.controller.updatedObjectsBlock = ^void(NSIndexSet *indexes)
+    {
+        XCTAssertTrue([NSThread isMainThread], @"");
+        blockUpdateDone = YES;
+    };
+    
     [self.controller performFetch:&error];
     
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
@@ -100,7 +111,7 @@
         }];
     });
     
-    AGWW_WAIT_WHILE(!self.updateDone, 2.0);
+    AGWW_WAIT_WHILE(!self.updateDone && !blockUpdateDone, 2.0);
     
     XCTAssertEqual([[self.controller managedObjects] count], (NSUInteger)1, @"");
     XCTAssertEqualObjects([[[self.controller managedObjects] firstObject] title], @"Hello!", @"");
@@ -112,10 +123,17 @@
  */
 -(void)testAsyncFetching
 {
+    __block bool blockFetchDone = NO;
+    self.controller.fetchedObjectsBlock = ^void(NSIndexSet *indexes, NSError *error)
+    {
+        XCTAssertTrue([NSThread isMainThread], @"");
+        blockFetchDone = YES;
+    };
+
     [self.controller performFetchAsyncronously];
     
     XCTAssertNil([self.controller managedObjects], @"");
-    AGWW_WAIT_WHILE(!self.fetchDone, 2.0);
+    AGWW_WAIT_WHILE(!self.fetchDone && !blockFetchDone, 2.0);
     XCTAssertEqual([[self.controller managedObjects] count], (NSUInteger)1, @"");
     
     Post *post = [[self.controller managedObjects] firstObject];
@@ -165,9 +183,17 @@
 {
     [self.controller performFetch:nil];
     
+    __block bool blockDeleteDone = NO;
+    self.controller.deletedObjectsBlock = ^void(NSIndexSet *indexes)
+    {
+        XCTAssertTrue([NSThread isMainThread], @"");
+        blockDeleteDone = YES;
+    };
+
+    
     [self.controller deleteObjectsAsyncronously];
     
-    AGWW_WAIT_WHILE(!self.deletionDone, 2.0);
+    AGWW_WAIT_WHILE(!self.deletionDone && !blockDeleteDone, 2.0);
     
     // On deletion the context is nilled out. isDeleted returns NO, though.
     XCTAssertNil(self.post.managedObjectContext, @"");
@@ -238,13 +264,21 @@
     [self.controller performFetch:nil];
     SJOManagedObjectController *objectsController = [[SJOManagedObjectController alloc] initWithWithManagedObjects:[self.controller managedObjects]];
     objectsController.delegate = self;
+    
+    __block bool blockUpdateDone = NO;
+    objectsController.updatedObjectsBlock = ^void(NSIndexSet *indexes)
+    {
+        XCTAssertTrue([NSThread isMainThread], @"");
+        blockUpdateDone = YES;
+    };
+    
     XCTAssertNotNil(objectsController, @"");
     
     self.post.title = @"Can you see me?";
     [self.managedObjectContext save:nil];
     
     XCTAssertTrue(!self.localControllerUpdateDone, @"");
-    AGWW_WAIT_WHILE(!self.localControllerUpdateDone, 2.0);
+    AGWW_WAIT_WHILE(!self.localControllerUpdateDone && !blockUpdateDone, 2.0);
     XCTAssertTrue(self.localControllerUpdateDone, @"");
     XCTAssertEqualObjects([[[objectsController managedObjects] firstObject] title], @"Can you see me?", @"");
 }
@@ -257,13 +291,21 @@
     [self.controller performFetch:nil];
     SJOManagedObjectController *objectsController = [[SJOManagedObjectController alloc] initWithWithManagedObject:[[self.controller managedObjects] firstObject]];
     objectsController.delegate = self;
+    
+    __block bool blockUpdateDone = NO;
+    objectsController.updatedObjectsBlock = ^void(NSIndexSet *indexes)
+    {
+        XCTAssertTrue([NSThread isMainThread], @"");
+        blockUpdateDone = YES;
+    };
+    
     XCTAssertNotNil(objectsController, @"");
     
     self.post.title = @"Can you see me?";
     [self.managedObjectContext save:nil];
     
     XCTAssertTrue(!self.localControllerUpdateDone, @"");
-    AGWW_WAIT_WHILE(!self.localControllerUpdateDone, 2.0);
+    AGWW_WAIT_WHILE(!self.localControllerUpdateDone && !blockUpdateDone, 2.0);
     XCTAssertTrue(self.localControllerUpdateDone, @"");
     XCTAssertEqualObjects([[[objectsController managedObjects] firstObject] title], @"Can you see me?", @"");
 }
@@ -277,6 +319,13 @@
     SJOManagedObjectController *objectsController = [[SJOManagedObjectController alloc] initWithWithManagedObject:[[self.controller managedObjects] firstObject]];
     objectsController.delegate = self;
     
+    __block bool blockUpdateDone = NO;
+    objectsController.updatedObjectsBlock = ^void(NSIndexSet *indexes)
+    {
+        XCTAssertTrue([NSThread isMainThread], @"");
+        blockUpdateDone = YES;
+    };
+    
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSManagedObjectContext* privateContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
         privateContext.persistentStoreCoordinator = [(AppDelegate*)[[UIApplication sharedApplication] delegate] persistentStoreCoordinator];
@@ -288,7 +337,7 @@
     });
 
     XCTAssertTrue(!self.localControllerUpdateDone, @"");
-    AGWW_WAIT_WHILE(!self.localControllerUpdateDone, 2.0);
+    AGWW_WAIT_WHILE(!self.localControllerUpdateDone && !blockUpdateDone, 2.0);
     XCTAssertTrue(self.localControllerUpdateDone, @"");
     XCTAssertEqual([[objectsController managedObjects] count], (NSUInteger)1, @"");
     XCTAssertEqualObjects([[[objectsController managedObjects] firstObject] title], @"Can you see me?", @"");

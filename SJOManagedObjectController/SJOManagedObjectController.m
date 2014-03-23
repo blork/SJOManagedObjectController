@@ -88,8 +88,12 @@ NSString* const SJOManagedObjectControllerErrorDomain = @"SJOManagedObjectContro
     }
     
     self.managedObjects = [self.managedObjectContext executeFetchRequest:self.fetchRequest error:error];
+    NSIndexSet *allIndexes = [self.managedObjects sjo_indexesOfObjects];
     if ([self.delegate respondsToSelector:@selector(controller:fetchedObjects:error:)]) {
-        [self.delegate controller:self fetchedObjects:[self.managedObjects sjo_indexesOfObjects] error:error];
+        [self.delegate controller:self fetchedObjects:allIndexes error:error];
+    }
+    if (self.fetchedObjectsBlock) {
+        self.fetchedObjectsBlock(allIndexes, *error);
     }
     return error ? NO : YES;
 }
@@ -173,7 +177,7 @@ NSString* const SJOManagedObjectControllerErrorDomain = @"SJOManagedObjectContro
     NSArray *updatedObjects = [[notification userInfo] objectForKey:NSUpdatedObjectsKey];
     NSArray *deletedObjects = [[notification userInfo] objectForKey:NSDeletedObjectsKey];
     
-    if ([self.delegate respondsToSelector:@selector(controller:updatedObjects:)] && updatedObjects && updatedObjects.count > 0) {
+    if (([self.delegate respondsToSelector:@selector(controller:updatedObjects:)] || self.updatedObjectsBlock) && updatedObjects && updatedObjects.count > 0) {
         NSIndexSet *updatedIndexes = [self.managedObjects indexesOfObjectsPassingTest:^BOOL(NSManagedObject* existingObject, NSUInteger idx, BOOL *stop) {
             for (NSManagedObject *updatedObject in updatedObjects) {
                 if ([updatedObject.objectID isEqual:existingObject.objectID]) {
@@ -184,11 +188,16 @@ NSString* const SJOManagedObjectControllerErrorDomain = @"SJOManagedObjectContro
         }];
         
         dispatch_async(dispatch_get_main_queue(), ^{
-            [self.delegate controller:self updatedObjects:updatedIndexes];
+            if ([self.delegate respondsToSelector:@selector(controller:updatedObjects:)]) {
+                [self.delegate controller:self updatedObjects:updatedIndexes];
+            }
+            if (self.updatedObjectsBlock) {
+                self.updatedObjectsBlock(updatedIndexes);
+            }
         });
     }
     
-    if ([self.delegate respondsToSelector:@selector(controller:deletedObjects:)] && deletedObjects && deletedObjects.count > 0) {
+    if (([self.delegate respondsToSelector:@selector(controller:deletedObjects:)] || self.deletedObjectsBlock) && deletedObjects && deletedObjects.count > 0) {
         NSIndexSet *deletedIndexes = [self.managedObjects indexesOfObjectsPassingTest:^BOOL(NSManagedObject* existingObject, NSUInteger idx, BOOL *stop) {
             for (NSManagedObject *deletedObject in deletedObjects) {
                 if ([deletedObject.objectID isEqual:existingObject.objectID]) {
@@ -199,7 +208,12 @@ NSString* const SJOManagedObjectControllerErrorDomain = @"SJOManagedObjectContro
         }];
         
         dispatch_async(dispatch_get_main_queue(), ^{
-            [self.delegate controller:self deletedObjects:deletedIndexes];
+            if ([self.delegate respondsToSelector:@selector(controller:deletedObjects:)]) {
+                [self.delegate controller:self deletedObjects:deletedIndexes];
+            }
+            if (self.deletedObjectsBlock) {
+                self.deletedObjectsBlock(deletedIndexes);
+            }
         });
     }
 }

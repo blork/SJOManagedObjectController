@@ -12,6 +12,10 @@
 
 extern NSString* const SJOManagedObjectControllerErrorDomain;
 
+typedef void (^SJOManagedObjectControllerObjectsChangedBlock)(NSIndexSet *changedObjectIndexes);
+typedef void (^SJOManagedObjectControllerObjectsFetchedBlock)(NSIndexSet *changedObjectIndexes, NSError *error);
+
+
 /**
  *  The delegate of a SJOManagedObjectController object must adopt the SJOManagedObjectControllerDeledate protocol. 
  *  Optional methods of the protocol allow the delegate to be informed of changes to the underlying managed objects.
@@ -37,7 +41,7 @@ extern NSString* const SJOManagedObjectControllerErrorDomain;
  *  @param changedObjectIndexes The indexes of the updated objects.
  */
 -(void)controller:(SJOManagedObjectController*)controller
-   updatedObjects:(NSIndexSet*)changedObjectIndexes;
+   updatedObjects:(NSIndexSet*)updatedObjectIndexes;
 
 /**
  *  Called when objects are deleted after the main context is saved or changes are merged from a background thread.
@@ -59,6 +63,21 @@ extern NSString* const SJOManagedObjectControllerErrorDomain;
 @property (nonatomic, strong, readonly) NSManagedObjectContext *managedObjectContext;
 
 @property (nonatomic, weak) id<SJOManagedObjectControllerDelegate> delegate;
+
+/**
+ *  A block callback to be called when objects are fetched as a result of performFetch:/performFetchAsync.
+ */
+@property (nonatomic, copy) SJOManagedObjectControllerObjectsFetchedBlock fetchedObjectsBlock;
+
+/**
+ *  A block callback to be called when objects are updated.
+ */
+@property (nonatomic, copy) SJOManagedObjectControllerObjectsChangedBlock updatedObjectsBlock;
+
+/**
+ *  A block callback to be called when objects are deleted.
+ */
+@property (nonatomic, copy) SJOManagedObjectControllerObjectsChangedBlock deletedObjectsBlock;
 
 /**
  *  Returns a SJOManagedObjectController set up with the given fetch request and context.
