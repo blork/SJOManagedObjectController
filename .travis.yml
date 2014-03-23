@@ -5,4 +5,4 @@ before_install:
   - brew install xctool
   - gem install cocoapods
   - pod install
-script: xctool test -workspace SJOManagedObjectController.xcworkspace/ -scheme SJOManagedObjectController
+script: xctool test -workspace SJOManagedObjectController.xcworkspace/ -scheme SJOManagedObjectController -sdk iphonesimulator -arch i386
