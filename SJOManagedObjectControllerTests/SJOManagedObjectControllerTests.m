@@ -78,8 +78,8 @@
     [self.controller performFetch:&error];
     
     XCTAssertNil(error, @"");
-    XCTAssertEqual([[self.controller managedObjects] count], 1, @"");
-    XCTAssertEqual([[self.controller managedObjects] firstObject], self.post, @"");
+    XCTAssertEqual([[self.controller managedObjects] count], (NSUInteger)1, @"");
+    XCTAssertEqualObjects([[self.controller managedObjects] firstObject], self.post, @"");
 }
 
 /**
@@ -102,7 +102,7 @@
     
     AGWW_WAIT_WHILE(!self.updateDone, 2.0);
     
-    XCTAssertEqual([[self.controller managedObjects] count], 1, @"");
+    XCTAssertEqual([[self.controller managedObjects] count], (NSUInteger)1, @"");
     XCTAssertEqualObjects([[[self.controller managedObjects] firstObject] title], @"Hello!", @"");
 }
 
@@ -116,10 +116,10 @@
     
     XCTAssertNil([self.controller managedObjects], @"");
     AGWW_WAIT_WHILE(!self.fetchDone, 2.0);
-    XCTAssertEqual([[self.controller managedObjects] count], 1, @"");
+    XCTAssertEqual([[self.controller managedObjects] count], (NSUInteger)1, @"");
     
     Post *post = [[self.controller managedObjects] firstObject];
-    XCTAssertEqual(post.managedObjectContext, self.managedObjectContext, @"");
+    XCTAssertEqualObjects(post.managedObjectContext, self.managedObjectContext, @"");
 }
 
 /**
@@ -129,7 +129,7 @@
 {
     [self.controller performFetch:nil];
     
-    XCTAssertEqual([[self.controller managedObjects] firstObject], self.post, @"");
+    XCTAssertEqualObjects([[self.controller managedObjects] firstObject], self.post, @"");
     
     NSError *error = nil;
     [self.controller deleteObjects:&error];
@@ -207,11 +207,11 @@
     post.title = @"Another test!";
     [self.managedObjectContext save:nil];
     
-    XCTAssertEqual([[self.controller managedObjects] count], 1, @"");
+    XCTAssertEqual([[self.controller managedObjects] count], (NSUInteger)1, @"");
     
     [self.controller performFetch:nil];
     
-    XCTAssertEqual([[self.controller managedObjects] count], 2, @"");
+    XCTAssertEqual([[self.controller managedObjects] count], (NSUInteger)2, @"");
     
     XCTAssertEqualObjects([[[self.controller managedObjects] firstObject] title], @"Another test!", @"");
 }
@@ -290,7 +290,7 @@
     XCTAssertTrue(!self.localControllerUpdateDone, @"");
     AGWW_WAIT_WHILE(!self.localControllerUpdateDone, 2.0);
     XCTAssertTrue(self.localControllerUpdateDone, @"");
-    XCTAssertEqual([[objectsController managedObjects] count], 1, @"");
+    XCTAssertEqual([[objectsController managedObjects] count], (NSUInteger)1, @"");
     XCTAssertEqualObjects([[[objectsController managedObjects] firstObject] title], @"Can you see me?", @"");
 
 }
