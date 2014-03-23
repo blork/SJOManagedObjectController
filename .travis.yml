@@ -1,0 +1,3 @@
+language: objective-c
+xcode_workspace: SJOManagedObjectController.xcworkspace
+xcode_scheme: SJOManagedObjectController
