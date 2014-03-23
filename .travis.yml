@@ -1,5 +1,6 @@
 language: objective-c
-xcode_workspace: SJOManagedObjectController.xcworkspace
-xcode_scheme: SJOManagedObjectController
-
-before_install: gem install cocoapods
+before_install:
+  - brew update
+  - brew install xctool
+  - pod install
+script: xctool test -workspace SJOManagedObjectController.xcworkspace/ -scheme SJOManagedObjectController
