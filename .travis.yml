@@ -1,5 +1,6 @@
 language: objective-c
 before_install:
+  - cd Example
   - brew update
   - brew unlink xctool
   - brew install xctool
