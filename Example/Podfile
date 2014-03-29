@@ -1,0 +1,8 @@
+platform :ios, "6.0"
+
+pod "SJOManagedObjectController", :path => '../SJOManagedObjectController.podspec'
+
+target "SJOManagedObjectControllerTests" do
+	pod "AGAsyncTestHelper"
+end
+

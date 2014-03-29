@@ -8,8 +8,8 @@
 
 #import <XCTest/XCTest.h>
 #import <AGAsyncTestHelper/AGAsyncTestHelper.h>
+#import <SJOManagedObjectController/SJOManagedObjectController.h>
 #import "AppDelegate.h"
-#import "SJOManagedObjectController.h"
 #import "Post.h"
 
 @interface SJOManagedObjectControllerTests : XCTestCase <SJOManagedObjectControllerDelegate>
@@ -157,7 +157,8 @@
     // On deletion the context is nilled out. isDeleted returns NO, though.
     XCTAssertNil(self.post.managedObjectContext, @"");
     XCTAssertTrue(self.post.isFault, @"");
-    
+    XCTAssertFalse(self.post.isInserted, @"");
+
     // Changing a deleted object causes Core Data to throw an exception:
     // "CoreData could not fulfill a fault"
     BOOL exceptionThrown = NO;
@@ -198,7 +199,8 @@
     // On deletion the context is nilled out. isDeleted returns NO, though.
     XCTAssertNil(self.post.managedObjectContext, @"");
     XCTAssertTrue(self.post.isFault, @"");
-    
+    XCTAssertFalse(self.post.isInserted, @"");
+
     NSError *error = nil;
     // Changing a deleted object causes Core Data to throw an exception:
     // "CoreData could not fulfill a fault"

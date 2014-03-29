@@ -1,0 +1,19 @@
+PODS:
+  - AGAsyncTestHelper (1.0):
+    - AGAsyncTestHelper/Core
+  - AGAsyncTestHelper/Core (1.0)
+  - SJOManagedObjectController (0.1.0)
+
+DEPENDENCIES:
+  - AGAsyncTestHelper
+  - SJOManagedObjectController (from `../SJOManagedObjectController.podspec`)
+
+EXTERNAL SOURCES:
+  SJOManagedObjectController:
+    :path: ../SJOManagedObjectController.podspec
+
+SPEC CHECKSUMS:
+  AGAsyncTestHelper: 5131f28651d8d29c2393e62901af8bfdb3c968d2
+  SJOManagedObjectController: 4f68da193f9f2547a66f58b82c9ae9f7766299e0
+
+COCOAPODS: 0.29.0
