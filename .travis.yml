@@ -1,9 +1,9 @@
 language: objective-c
 before_install:
-  - cd Example
   - brew update
   - brew unlink xctool
   - brew install xctool
   - gem install cocoapods
+  - cd Example
   - pod install
 script: xctool test -workspace SJOManagedObjectController.xcworkspace/ -scheme SJOManagedObjectController -sdk iphonesimulator -arch i386
