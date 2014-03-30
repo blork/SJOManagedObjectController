@@ -164,7 +164,6 @@
     BOOL exceptionThrown = NO;
     @try {
         self.post.title = @"Deleted!";
-        [self.managedObjectContext save:&error];
         XCTFail(@"Core Data should throw exception with error 'CoreData could not fulfill a fault'.");
     }
     @catch (NSException *exception) {
@@ -207,7 +206,6 @@
     BOOL exceptionThrown = NO;
     @try {
         self.post.title = @"Deleted!";
-        [self.managedObjectContext save:&error];
         XCTFail(@"Core Data should throw exception with error 'CoreData could not fulfill a fault'.");
     }
     @catch (NSException *exception) {
