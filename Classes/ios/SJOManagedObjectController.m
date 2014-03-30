@@ -187,14 +187,16 @@ NSString* const SJOManagedObjectControllerErrorDomain = @"SJOManagedObjectContro
             return NO;
         }];
         
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if ([self.delegate respondsToSelector:@selector(controller:updatedObjects:)]) {
-                [self.delegate controller:self updatedObjects:updatedIndexes];
-            }
-            if (self.updatedObjectsBlock) {
-                self.updatedObjectsBlock(updatedIndexes);
-            }
-        });
+        if (updatedIndexes.count > 0) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if ([self.delegate respondsToSelector:@selector(controller:updatedObjects:)]) {
+                    [self.delegate controller:self updatedObjects:updatedIndexes];
+                }
+                if (self.updatedObjectsBlock) {
+                    self.updatedObjectsBlock(updatedIndexes);
+                }
+            });
+        }
     }
     
     if (([self.delegate respondsToSelector:@selector(controller:deletedObjects:)] || self.deletedObjectsBlock) && deletedObjects && deletedObjects.count > 0) {
@@ -207,14 +209,16 @@ NSString* const SJOManagedObjectControllerErrorDomain = @"SJOManagedObjectContro
             return NO;
         }];
         
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if ([self.delegate respondsToSelector:@selector(controller:deletedObjects:)]) {
-                [self.delegate controller:self deletedObjects:deletedIndexes];
-            }
-            if (self.deletedObjectsBlock) {
-                self.deletedObjectsBlock(deletedIndexes);
-            }
-        });
+        if (deletedIndexes.count > 0) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if ([self.delegate respondsToSelector:@selector(controller:deletedObjects:)]) {
+                    [self.delegate controller:self deletedObjects:deletedIndexes];
+                }
+                if (self.deletedObjectsBlock) {
+                    self.deletedObjectsBlock(deletedIndexes);
+                }
+            });
+        }
     }
 }
 
